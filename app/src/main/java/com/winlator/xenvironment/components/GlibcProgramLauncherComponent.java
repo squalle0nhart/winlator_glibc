@@ -118,7 +118,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         envVars.put("HOME", imageFs.home_path);
         envVars.put("USER", ImageFs.USER);
         envVars.put("TMPDIR",imageFs.getRootDir().getPath()+"/tmp");
-        envVars.put("LC_ALL", "zh_CN.UTF-8");
+        envVars.put("LC_ALL", "en_US.UTF-8");
         envVars.put("DISPLAY", ":0");
         envVars.put("PATH", imageFs.getWinePath() + "/bin:" +
                 imageFs.getRootDir().getPath() + "/usr/bin:" +
