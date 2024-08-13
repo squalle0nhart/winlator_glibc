@@ -1,43 +1,71 @@
 [
     {
-        "name" : "Preset",
+        "name" : "Extra Tools",
         "children" : [
             {
-                "name" : "VirGL",
+                "name" : "Mesa VirGL Install",
                 "children" : [
                     {
-                        "name" : "VirGL Mesa 6.1.7",
-                        "path" : "Z:/opt/Preset/DeadS/1.bat"
+                        "name" : "VirGL Mesa 18.3.0",
+                        "path" : "Z:/opt/bat/virgl/virgl-mesa-18.bat"
                     },
                     {
-                        "name" : "VirGL Mesa 7.1",
-                        "path" : "Z:/opt/Preset/Fallout/1.bat"
+                        "name" : "VirGL Mesa 19.1.8",
+                        "path" : "Z:/opt/bat/virgl/virgl-mesa-19.bat"
+                    },
+                    {
+                        "name" : "VirGL Mesa 22.1.7",
+                        "path" : "Z:/opt/bat/virgl/virgl-mesa-22.bat"
+                    },
+                    {
+                        "name" : "VirGL Mesa 24.0.0",
+                        "path" : "Z:/opt/bat/virgl/virgl-mesa-24.bat"
                     }
                 ]
             },
             {
-                "name" : "Wine 3D",
+                "name" : "WineD3D Install",
                 "children" : [
                     {
                         "name" : "Win3D (VirGL) 3.6",
-                        "path" : "Z:/opt/Preset/Fallout/3.bat"
+                        "path" : "Z:/opt/bat/wine/wined3d_3.6.bat"
                     },
                     {
                         "name" : "Win3D 4.13",
-                        "path" : "Z:/opt/Preset/DeadS/3.bat"
+                        "path" : "Z:/opt/bat/wine/wined3d_4.13.bat"
                     },
                     {
                         "name" : "Win3D 4.18",
-                        "path" : "Z:/opt/Preset/reset/3.bat"
+                        "path" : "Z:/opt/bat/wine/wined3d_4.18.bat"
                     },
                     {
-                        "name" : "Win3D 9.0-1 Proton",
-                        "path" : "Z:/opt/Preset/gta/3.bat"
+                        "name" : "Win3D 7.2",
+                        "path" : "Z:/opt/bat/wine/wined3d_7.2.bat"
+                    },
+                    {
+                        "name" : "Win3D 7.21",
+                        "path" : "Z:/opt/bat/wine/wined3d_7.21.bat"
+                    },
+                    {
+                        "name" : "Win3D 7.8",
+                        "path" : "Z:/opt/bat/wine/wined3d_7.8.bat"
+                    },
+                    {
+                        "name" : "Win3D 8.0.2",
+                        "path" : "Z:/opt/bat/wine/wined3d_8.0.2.bat"
+                    },
+                    {
+                        "name" : "Win3D 8.20",
+                        "path" : "Z:/opt/bat/wine/wined3d_8.20.bat"
+                    },
+                    {
+                        "name" : "Win3D 9.0 Proton",
+                        "path" : "Z:/opt/bat/wine/wined3d_9.0.bat"
                     }
                 ]
             },
             {
-                "name" : "Extras",
+                "name" : "Tools",
                 "children" : [
                     {
                         "name" : "OpenAL",
