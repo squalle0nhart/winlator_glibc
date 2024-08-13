@@ -8,3 +8,5 @@
 .externalNativeBuild
 .cxx
 /app/release
+app/key.properties
+app/signKey

@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('./app/key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace 'com.winlator'
     compileSdk 34
@@ -21,6 +27,16 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+            storePassword keystoreProperties['storePassword']
+
+        }
+    }
+
     buildTypes {
         debug {
             minifyEnabled true
@@ -38,6 +54,7 @@ android {
             ndk {
                 abiFilters 'arm64-v8a'
             }
+            signingConfig signingConfigs.release
         }
     }
 
