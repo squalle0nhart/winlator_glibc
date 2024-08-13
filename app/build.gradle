@@ -7,7 +7,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    compileSdk 30
+    compileSdk 34
     namespace 'com.winlator'
     defaultConfig {
         applicationId 'com.winlator'
