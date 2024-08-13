@@ -5,6 +5,7 @@ import android.content.Context;
 import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -174,6 +175,24 @@ public class ContentDialog extends Dialog {
             callback.call(result);
         });
 
+        dialog.show();
+    }
+
+    public static void showSingleChoiceList(Context context, int titleResId, final String[] items, Callback<Integer> callback) {
+        ContentDialog dialog = new ContentDialog(context);
+        dialog.getContentView().findViewById(R.id.BTConfirm).setVisibility(View.GONE);
+
+        final ListView listView = dialog.findViewById(R.id.ListView);
+        listView.getLayoutParams().width = AppUtils.getPreferredDialogWidth(context);
+        listView.setChoiceMode(ListView.CHOICE_MODE_NONE);
+        listView.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_list_item_single_choice, items));
+        listView.setVisibility(View.VISIBLE);
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            callback.call(position);
+            dialog.dismiss();
+        });
+
+        dialog.setTitle(titleResId);
         dialog.show();
     }
 }
