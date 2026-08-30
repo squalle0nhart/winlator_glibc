@@ -23,18 +23,22 @@ add_library(winlator SHARED
         winlator/alsa_client.c
         winlator/vulkan.c
 
-        winlator/renderer/EGL/egl.cpp
-        winlator/renderer/EGL/renderer_jni.cpp
-        winlator/renderer/EGL/shader.cpp
-        winlator/renderer/EGL/window.cpp
-        winlator/renderer/EGL/cursor.cpp
-        winlator/renderer/EGL/xform.cpp
-        winlator/renderer/EGL/view_transformation.cpp
-        winlator/renderer/EGL/displayx.cpp
-        winlator/renderer/EGL/displayx_jni.cpp
+        winlator/renderer/egl.cpp
+        winlator/renderer/renderer_jni.cpp
+        winlator/renderer/shader.cpp
+        winlator/renderer/window.cpp
+        winlator/renderer/cursor.cpp
+        winlator/renderer/xform.cpp
+        winlator/renderer/view_transformation.cpp
+        winlator/renderer/displayx.cpp
+        winlator/renderer/effectcomposer/effect_composer.cpp
 )
 
 target_compile_options(winlator PRIVATE -Wall -Wextra)
+target_include_directories(winlator PRIVATE
+        winlator/renderer
+        winlator/renderer/effectcomposer
+)
 
 target_link_libraries(winlator
         log
@@ -46,6 +50,7 @@ target_link_libraries(winlator
         GLESv2
         GLESv3
         adrenotools
+        vulkan
 )
 
 add_library(fakeinput SHARED
