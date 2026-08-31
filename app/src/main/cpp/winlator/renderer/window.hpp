@@ -29,7 +29,7 @@ struct Window {
     std::unordered_map<int, std::unique_ptr<struct Drawable>> directContents;
     Drawable *currentDirectContent;
     ASurfaceControl *control;
-    bool backPressureEnabled;
+    bool backPressureEnabled = false;
         
     bool hasDirectContents() {
         return !directContents.empty();
