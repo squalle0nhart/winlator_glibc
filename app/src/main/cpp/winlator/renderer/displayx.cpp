@@ -7,6 +7,7 @@
 #include <string.h>
 #include <thread>
 #include <mutex>
+#include <chrono>
 
 #include <android/api-level.h>
 #include <android/log.h>
@@ -324,7 +325,7 @@ void DisplayX::networkThreadLoop() {
                             presentRequests.push(std::move(presentRequest));
                             if (xServer->isShowFPS.load(std::memory_order_relaxed))
                                 env->CallVoidMethod(xServer->xserverDisplayActivity, cache->updateFrameRating, swapchain->window->windowObj);
-                            if (!presentRR) presentLock.notify();
+                            presentLock.notify();
                             break;
                         }    
                         case DESTROY_CLIENT_SWAPCHAIN: {
@@ -410,6 +411,8 @@ void DisplayX::eventThreadLoop() {
             eventLock.notify();
         }
         
+        if (currentState != State::NONE) presentLock.notify();
+
         if (!eventQueue.empty() && hasSurface && surfaceChanged && !paused) {
             func = eventQueue.front();
             eventQueue.pop();
@@ -487,14 +490,25 @@ void DisplayX::presentThreadLoop() {
     while(true) {
         auto lock = presentLock.lock();
         
-        presentLock.wait(lock, [&]{ 
-            return stopped || (eventsPending == 0 && ((requestUpdate && presentRR) || (!presentRequests.empty() && !presentRR)) && hasSurface && surfaceChanged && !paused);
+        presentLock.wait(lock, [&]{
+            return stopped || (eventsPending == 0 && !presentRequests.empty() && hasSurface && surfaceChanged && !paused);
         });
         
         if (stopped) {
             printf("Stopping presentThread");
             cache->detachEnv(env);
             break;
+        }
+
+        if (presentRR && !requestUpdate) {
+            int64_t frameNanos = static_cast<int64_t>(1000000000.0f /
+                std::max(1.0f, xServer->refreshRate));
+            presentLock.cv.wait_for(lock, std::chrono::nanoseconds(frameNanos), [&] {
+                return stopped || requestUpdate || !presentRR;
+            });
+            if (stopped) break;
+            if (eventsPending != 0 || presentRequests.empty() || !hasSurface ||
+                !surfaceChanged || paused) continue;
         }
         
         std::queue<std::unique_ptr<PresentRequest>> requests;
@@ -671,7 +685,7 @@ void DisplayX::requestWindowUpdate(Window *window) {
     presentRequest->window = window;
     
     presentRequests.push(std::move(presentRequest));
-    if (!presentRR) presentLock.notify();
+    presentLock.notify();
 }
 
 void DisplayX::requestCursorUpdate() {
@@ -718,6 +732,9 @@ void DisplayX::mapWindow(Window *window) {
     
     if (!windowManager->getUnviewableWMClass().empty() && !strcmp(window->className.c_str(), windowManager->getUnviewableWMClass().c_str()))
         window->enabled = false;
+
+    if (!window->enabled)
+        pfnASurfaceTransactionSetBuffer(windowTransaction, window->control, nullptr, -1);
     
     pfnASurfaceTransactionSetVisibility(windowTransaction, window->control, ASURFACE_TRANSACTION_VISIBILITY_SHOW);
     pfnASurfaceTransactionApply(windowTransaction);

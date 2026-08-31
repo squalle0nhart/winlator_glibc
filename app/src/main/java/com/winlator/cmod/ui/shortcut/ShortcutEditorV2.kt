@@ -81,6 +81,7 @@ import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.GPUInformation
+import com.winlator.cmod.core.LsfgVkManager
 import com.winlator.cmod.core.OpenGLDriverDefaults
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.fexcore.FEXCorePresetManager
@@ -92,6 +93,7 @@ import com.winlator.cmod.ui.settings.DriverOption
 import com.winlator.cmod.ui.settings.DxvkAsyncMode
 import com.winlator.cmod.ui.settings.EnvironmentVariablesEditor
 import com.winlator.cmod.ui.settings.DDrawWrapperChoice
+import com.winlator.cmod.ui.settings.FrameGenerationSettings
 import com.winlator.cmod.ui.settings.SettingChoice
 import com.winlator.cmod.ui.settings.SettingDriverChoice
 import com.winlator.cmod.ui.settings.SettingInstallChoice
@@ -166,6 +168,13 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var displayXPresentAtRefreshRate by mutableStateOf(shortcut.getDisplayXPresentAtRefreshRate())
     var displayXBackPressure by mutableStateOf(shortcut.getDisplayXBackPressure())
     var displayXPrecisePresentation by mutableStateOf(shortcut.getDisplayXPrecisePresentation())
+    var frameGenBackend by mutableStateOf(shortcut.getFrameGenBackend())
+    var lsfgMultiplier by mutableIntStateOf(shortcut.getLsfgMultiplier())
+    var lsfgFlowScale by mutableStateOf(shortcut.getLsfgFlowScale())
+    var lsfgPerformanceMode by mutableStateOf(shortcut.getLsfgPerformanceMode())
+    var winFgMultiplier by mutableIntStateOf(shortcut.getWinFgMultiplier())
+    var winFgFlowScale by mutableStateOf(shortcut.getWinFgFlowScale())
+    var winFgModel by mutableIntStateOf(shortcut.getWinFgModel())
     var graphicsDriver by mutableStateOf(StringUtils.parseIdentifier(shortcut.getExtra("graphicsDriver", container.getGraphicsDriver())))
     private val defaultDriverVersion = runCatching {
         val context = container.manager.context
@@ -377,6 +386,18 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
         shortcut.setDisplayXPresentAtRefreshRate(displayXPresentAtRefreshRate)
         shortcut.setDisplayXBackPressure(displayXBackPressure)
         shortcut.setDisplayXPrecisePresentation(displayXPrecisePresentation)
+        save()
+    }
+
+    fun saveFrameGeneration() {
+        shortcut.setFrameGenBackend(frameGenBackend)
+        shortcut.setLsfgMultiplier(lsfgMultiplier)
+        shortcut.setLsfgEnabled(frameGenBackend == "lsfg_vk" && lsfgMultiplier >= 2)
+        shortcut.setLsfgFlowScale(lsfgFlowScale)
+        shortcut.setLsfgPerformanceMode(lsfgPerformanceMode)
+        shortcut.setWinFgMultiplier(winFgMultiplier)
+        shortcut.setWinFgFlowScale(winFgFlowScale)
+        shortcut.setWinFgModel(winFgModel)
         save()
     }
 
@@ -828,6 +849,24 @@ private fun ShortcutCategoryV2(
                     }
                 }
             }
+            if (s.renderer != "EGL") {
+                SettingsCard {
+                    val winFg = s.frameGenBackend == "win_fg"
+                    FrameGenerationSettings(
+                        backend = s.frameGenBackend,
+                        multiplier = if (winFg) s.winFgMultiplier else s.lsfgMultiplier,
+                        flowScale = if (winFg) s.winFgFlowScale else s.lsfgFlowScale,
+                        winFgModel = s.winFgModel,
+                        lsfgPerformanceMode = s.lsfgPerformanceMode,
+                        lsfgAvailable = LsfgVkManager.isGlobalDllAvailable(context) || LsfgVkManager.containerDllPath(s.shortcut) != null,
+                        onBackendChanged = { s.frameGenBackend = it; s.saveFrameGeneration() },
+                        onMultiplierChanged = { if (winFg) s.winFgMultiplier = it else s.lsfgMultiplier = it; s.saveFrameGeneration() },
+                        onFlowScaleChanged = { if (winFg) s.winFgFlowScale = it else s.lsfgFlowScale = it; s.saveFrameGeneration() },
+                        onWinFgModelChanged = { s.winFgModel = it; s.saveFrameGeneration() },
+                        onLsfgPerformanceModeChanged = { s.lsfgPerformanceMode = it; s.saveFrameGeneration() }
+                    )
+                }
+            }
             SettingsCard {
                 SettingChoice("Graphics Driver", graphicsEntries.firstOrNull { StringUtils.parseIdentifier(it).equals(s.graphicsDriver, true) } ?: s.graphicsDriver, graphicsEntries) {
                     s.selectGraphicsDriver(StringUtils.parseIdentifier(it))
@@ -1174,4 +1213,3 @@ private fun renameShortcutV2(shortcut: Shortcut, requested: String) {
         if (!newLink.exists()) oldLink.renameTo(newLink)
     }
 }
-

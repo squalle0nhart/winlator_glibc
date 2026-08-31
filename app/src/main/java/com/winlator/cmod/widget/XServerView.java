@@ -7,6 +7,7 @@ import android.view.Choreographer;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import com.winlator.cmod.R;
+import com.winlator.cmod.XServerDisplayActivity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -173,12 +174,6 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
         nativeMapWindow(window.id);
     }
 
-    @Override
-    public void onModifyWindowProperty(Window window, Property property) {
-        if ("WM_CLASS".equals(property.nameAsString()))
-            hideUnviewableWindow(window, property.toString(), true);
-    }
-
     private boolean hideUnviewableWindow(Window window, String wmClass, boolean unmap) {
         if (unviewableWMClasses == null || wmClass == null) return false;
         for (String cls : unviewableWMClasses) {
@@ -210,18 +205,25 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
     public void onUpdateWindowContentDirect(Window window, Drawable drawable) {
         reportFrame(window.id);
         nativeUpdateDirectContent(window.id, drawable.id);
+        notifyRendererFrame(window);
     }
 
     @Override
     public void onUpdateWindowContentDirect(Window window, Drawable drawable, short xOff, short yOff) {
         reportFrame(window.id);
         nativeUpdateDirectContent(window.id, drawable.id);
+        notifyRendererFrame(window);
     }
 
     private void reportFrame(int windowId) {
         if (windowId != fpsWindowId) return;
         if (hudRef != null) hudRef.onFrame();
         if (classicHudRef != null) classicHudRef.update();
+    }
+
+    private void notifyRendererFrame(Window window) {
+        if (window != null && context instanceof XServerDisplayActivity)
+            ((XServerDisplayActivity) context).onRendererFrame(window);
     }
 
     @Override
@@ -295,8 +297,10 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
     
     @Override
     public void onModifyWindowProperty(Window window, Property property) {
-        if (property.nameAsString().equals("WM_CLASS"))
+        if (property.nameAsString().equals("WM_CLASS")) {
             nativeSetWindowClassName(window.id, property.toString());
+            hideUnviewableWindow(window, property.toString(), true);
+        }
     }
     
     @Override
