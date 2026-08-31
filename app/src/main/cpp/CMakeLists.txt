@@ -8,34 +8,33 @@ add_subdirectory(OpenXR-SDK)
 add_subdirectory(patchelf)
 add_subdirectory(adrenotools)
 
-# Add Winlator shared library
 add_library(winlator SHARED
         xr/engine.c
         xr/framebuffer.c
         xr/input.c
+        winlator/process_helper.c
         xr/main.c
         xr/math.c
         xr/renderer.c
         winlator/drawable.c
         winlator/gpu_image.c
-        winlator/process_helper.c
         winlator/sysvshared_memory.c
         winlator/xconnector_epoll.c
         winlator/alsa_client.c
         winlator/vulkan.c
-        winlator/renderer/egl.cpp
-        winlator/renderer/renderer_jni.cpp
-        winlator/renderer/shader.cpp
-        winlator/renderer/window.cpp
-        winlator/renderer/cursor.cpp
-        winlator/renderer/xform.cpp
-        winlator/renderer/view_transformation.cpp
-        winlator/renderer/displayx.cpp
-        winlator/renderer/effectcomposer/effect_composer.cpp
+
+        winlator/renderer/EGL/egl.cpp
+        winlator/renderer/EGL/renderer_jni.cpp
+        winlator/renderer/EGL/shader.cpp
+        winlator/renderer/EGL/window.cpp
+        winlator/renderer/EGL/cursor.cpp
+        winlator/renderer/EGL/xform.cpp
+        winlator/renderer/EGL/view_transformation.cpp
+        winlator/renderer/EGL/displayx.cpp
+        winlator/renderer/EGL/displayx_jni.cpp
 )
 
 target_compile_options(winlator PRIVATE -Wall -Wextra)
-target_include_directories(winlator PRIVATE winlator/renderer winlator/renderer/effectcomposer)
 
 target_link_libraries(winlator
         log
@@ -47,10 +46,8 @@ target_link_libraries(winlator
         GLESv2
         GLESv3
         adrenotools
-        vulkan
 )
 
-# Add Fake Input library for controller emulation (loaded via LD_PRELOAD)
 add_library(fakeinput SHARED
         winlator/fakeinput.cpp
 )
@@ -62,73 +59,31 @@ target_link_libraries(fakeinput
         dl
 )
 
-# Keep the Pypetto DisplayX/EGL target above untouched.  The optional Vulkan
-# renderer is a separate JNI library so selecting it cannot change the native
-# presentation path used by DisplayX or EGL.
 set(VULKAN_RENDERER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/winlator/renderer/vulkan)
 
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_vert.h
-    COMMAND glslangValidator -V --vn window_vert_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_vert.h
-            ${VULKAN_RENDERER_DIR}/window.vert
-    DEPENDS ${VULKAN_RENDERER_DIR}/window.vert
-    COMMENT "Compiling window.vert -> window_vert.h"
-)
+function(compile_shader_header source_file output_file variable_name description)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${output_file}
+        COMMAND ${CMAKE_COMMAND}
+                -DGLSL_COMPILER=${GLSL_COMPILER}
+                -DGLSLANG_VALIDATOR=${GLSLANG_VALIDATOR}
+                -DSOURCE_FILE=${VULKAN_RENDERER_DIR}/${source_file}
+                -DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/${output_file}
+                -DVARIABLE_NAME=${variable_name}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/compile_shader.cmake
+        DEPENDS ${VULKAN_RENDERER_DIR}/${source_file} ${CMAKE_CURRENT_SOURCE_DIR}/compile_shader.cmake
+        COMMENT "${description}"
+        VERBATIM
+    )
+endfunction()
 
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
-    COMMAND glslangValidator -V --vn window_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
-            ${VULKAN_RENDERER_DIR}/window.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window.frag
-    COMMENT "Compiling window.frag -> window_frag.h"
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
-    COMMAND glslangValidator -V --vn window_sgsr_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
-            ${VULKAN_RENDERER_DIR}/window_sgsr.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window_sgsr.frag
-    COMMENT "Compiling window_sgsr.frag -> window_sgsr_frag.h"
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_fsr1_frag.h
-    COMMAND glslangValidator -V --vn window_fsr1_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_fsr1_frag.h
-            ${VULKAN_RENDERER_DIR}/window_fsr1.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window_fsr1.frag
-    COMMENT "Compiling single-pass FSR -> window_fsr1_frag.h"
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_lanczos_frag.h
-    COMMAND glslangValidator -V --vn window_lanczos_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_lanczos_frag.h
-            ${VULKAN_RENDERER_DIR}/window_lanczos.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window_lanczos.frag
-    COMMENT "Compiling Lanczos 2 -> window_lanczos_frag.h"
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
-    COMMAND glslangValidator -V --vn window_stretch_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
-            ${VULKAN_RENDERER_DIR}/window_stretch.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window_stretch.frag
-    COMMENT "Compiling window_stretch.frag -> window_stretch_frag.h"
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
-    COMMAND glslangValidator -V --vn window_postfx_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
-            ${VULKAN_RENDERER_DIR}/window_postfx.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window_postfx.frag
-    COMMENT "Compiling window_postfx.frag -> window_postfx_frag.h"
-)
+compile_shader_header(window.vert window_vert.h window_vert_code "Compiling window.vert → window_vert.h")
+compile_shader_header(window.frag window_frag.h window_frag_code "Compiling window.frag → window_frag.h")
+compile_shader_header(window_sgsr.frag window_sgsr_frag.h window_sgsr_frag_code "Compiling window_sgsr.frag → window_sgsr_frag.h")
+compile_shader_header(window_fsr1.frag window_fsr1_frag.h window_fsr1_frag_code "Compiling single-pass FSR → window_fsr1_frag.h")
+compile_shader_header(window_lanczos.frag window_lanczos_frag.h window_lanczos_frag_code "Compiling Lanczos 2 → window_lanczos_frag.h")
+compile_shader_header(window_stretch.frag window_stretch_frag.h window_stretch_frag_code "Compiling window_stretch.frag → window_stretch_frag.h")
+compile_shader_header(window_postfx.frag window_postfx_frag.h window_postfx_frag_code "Compiling window_postfx.frag → window_postfx_frag.h")
 
 set(VULKAN_CONTEXT_SOURCE ${VULKAN_RENDERER_DIR}/VulkanRendererContext.cpp)
 set(VULKAN_CONTEXT_LEGACY ${CMAKE_CURRENT_BINARY_DIR}/VulkanRendererContext_legacy.cpp)
@@ -199,12 +154,12 @@ string(REPLACE
 
 string(REPLACE
     "auto modeName=[](int m){ return m==1?\"NEAREST\":m==2?\"SGSR\":m==3?\"FSR1\":\"LINEAR\"; };"
-    "auto modeName=[](int m){ return m==1?\"NEAREST\":m==2?\"SGSR\":m==3?\"FSR\":m==4?\"LANCZOS2\":m==5?\"COLOR_BOOST\":\"LINEAR\"; };"
+    "auto modeName=[](int m){ return m==1?\"NEAREST\":m==2?\"SGSR\":m==3?\"FSR\":m==4?\"LANCZOS2\":\"LINEAR\"; };"
     VULKAN_CONTEXT_TEXT
     "${VULKAN_CONTEXT_TEXT}")
 string(REPLACE
     "filterMode, filterMode==3?\"FSR1\":filterMode==2?\"SGSR\":filterMode==1?\"NEAREST\":\"LINEAR\");"
-    "filterMode, filterMode==5?\"COLOR_BOOST\":filterMode==4?\"LANCZOS2\":filterMode==3?\"FSR\":filterMode==2?\"SGSR\":filterMode==1?\"NEAREST\":\"LINEAR\");"
+    "filterMode, filterMode==4?\"LANCZOS2\":filterMode==3?\"FSR\":filterMode==2?\"SGSR\":filterMode==1?\"NEAREST\":\"LINEAR\");"
     VULKAN_CONTEXT_TEXT
     "${VULKAN_CONTEXT_TEXT}")
 
@@ -233,14 +188,8 @@ add_library(vulkan_renderer SHARED
         ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
 )
 
-set_target_properties(vulkan_renderer PROPERTIES
-        CXX_STANDARD 17
-        CXX_STANDARD_REQUIRED ON
-        CXX_EXTENSIONS OFF
-)
-
 target_compile_options(vulkan_renderer PRIVATE
-        -Wall -Wextra -fvisibility=hidden
+        -Wall -Wextra -fvisibility=hidden -std=c++17
 )
 
 target_link_libraries(vulkan_renderer

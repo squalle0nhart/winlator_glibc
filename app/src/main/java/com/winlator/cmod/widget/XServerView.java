@@ -46,10 +46,9 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
     private Context context;
     private int surfaceWidth;
     private int surfaceHeight;
-    private boolean fullscreen = false;
-    private String unviewableWMClass = null;
+    private int fullscreenMode = ViewTransformation.FULLSCREEN_OFF;
+    private String[] unviewableWMClasses;
     private boolean screenOffsetYRelativeToCursor = false;
-    private boolean toggleFullscreen = false;
     private boolean magnifierEnabled = true;
     private boolean viewportNeedsUpdate = true;
     private float magnifierZoom = 1.0f;
@@ -107,8 +106,8 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
     }
     
     public void toggleFullscreen() {
-        toggleFullscreen = true;
-        nativeToggleFullscreen();
+        setFullscreenMode(isFullscreen()
+                ? ViewTransformation.FULLSCREEN_OFF : ViewTransformation.FULLSCREEN_STRETCH);
     }
     
     public void setCursorVisible(boolean cursorVisible) {
@@ -122,7 +121,21 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
     }
 
     public boolean isFullscreen() {
-        return fullscreen;
+        return fullscreenMode != ViewTransformation.FULLSCREEN_OFF;
+    }
+
+    @Override
+    public int getFullscreenMode() {
+        return fullscreenMode;
+    }
+
+    @Override
+    public void setFullscreenMode(int mode) {
+        if (mode < ViewTransformation.FULLSCREEN_OFF || mode > ViewTransformation.FULLSCREEN_INTEGER)
+            mode = ViewTransformation.FULLSCREEN_OFF;
+        if (mode == fullscreenMode) return;
+        fullscreenMode = mode;
+        nativeSetFullscreenMode(mode);
     }
 
     public float getMagnifierZoom() {
@@ -140,8 +153,8 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
 
     @Override
     public void setUnviewableWMClasses(String... classes) {
-        this.unviewableWMClass = classes != null && classes.length > 0 ? classes[0] : null;
-        nativeSetUnviewableWMClass(this.unviewableWMClass);
+        unviewableWMClasses = classes;
+        nativeSetUnviewableWMClass(classes != null && classes.length > 0 ? classes[0] : "");
     }
     
     @Override
@@ -156,16 +169,26 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
 
     @Override
     public void onMapWindow(Window window) {
-        if (unviewableWMClass != null) {
-            String wmClass = window.getClassName();
-            if (wmClass.contains(unviewableWMClass)) {
-                if (window.attributes.isEnabled()) {
-                    window.disableAllDescendants();
-                }    
+        if (hideUnviewableWindow(window, window.getClassName(), false)) return;
+        nativeMapWindow(window.id);
+    }
+
+    @Override
+    public void onModifyWindowProperty(Window window, Property property) {
+        if ("WM_CLASS".equals(property.nameAsString()))
+            hideUnviewableWindow(window, property.toString(), true);
+    }
+
+    private boolean hideUnviewableWindow(Window window, String wmClass, boolean unmap) {
+        if (unviewableWMClasses == null || wmClass == null) return false;
+        for (String cls : unviewableWMClasses) {
+            if (wmClass.toLowerCase(java.util.Locale.ROOT).contains(cls.toLowerCase(java.util.Locale.ROOT))) {
+                if (window.attributes.isEnabled()) window.disableAllDescendants();
+                if (unmap) nativeUnmapWindow(window.id);
+                return true;
             }
         }
-        
-        nativeMapWindow(window.id);
+        return false;
     }
 
     @Override
@@ -329,7 +352,7 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
     @FastNative
     public native void nativePointerMove(int x, int y);
     @FastNative
-    public native void nativeToggleFullscreen();
+    public native void nativeSetFullscreenMode(int mode);
     @FastNative
     public native void nativeSetCursorVisible(boolean visible);
     @FastNative

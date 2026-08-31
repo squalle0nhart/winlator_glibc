@@ -138,7 +138,7 @@ class DisplayX {
         
         bool requestUpdate = false;
         
-        bool fullscreen = false;
+        int fullscreenMode = 0;
         int eventsPending = 0;
         int64_t previousReportedWorkTime = 0;
         AVsyncId vsyncId = -1;
@@ -191,7 +191,7 @@ class DisplayX {
         void reparentWindow(Window *window, Window *parent);
         void updateCursor(Cursor *cursor);
         void showCursor();
-        void toggleFullscreen();
+        void setFullscreenMode(int mode);
         void setPerformanceMode(bool perfMode);
         void setPresentRR(bool presentRR);
         void setBackPressure(bool backPressure);

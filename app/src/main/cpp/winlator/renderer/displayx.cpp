@@ -909,32 +909,22 @@ void DisplayX::resizeRootWindow() {
     auto rootWindow = windowManager->getRootWindow();
     if (!rootWindow) return;
     
-    viewTransformation.update(surfaceWidth, surfaceHeight, rootWindow->width, rootWindow->height);
-    
-    ARect src{};
+    ARect src{0, 0, rootWindow->width, rootWindow->height};
     ARect dst{};
-    
-    if (fullscreen) {
-        src.left = viewTransformation.viewOffsetX;
-        src.top = viewTransformation.viewOffsetY;
-        src.right = viewTransformation.viewOffsetX + viewTransformation.viewWidth;
-        src.bottom = viewTransformation.viewOffsetY + viewTransformation.viewHeight;
-        
-        dst.left = 0;
-        dst.top = 0;
-        dst.right = surfaceWidth;
-        dst.bottom = surfaceHeight;
-    }
-    else {
-        src.left = 0;
-        src.top = 0;
-        src.right = surfaceWidth;
-        src.bottom = surfaceHeight;
-        
-        dst.left = viewTransformation.viewOffsetX;
-        dst.top = viewTransformation.viewOffsetY;
-        dst.right = viewTransformation.viewOffsetX + viewTransformation.viewWidth;
-        dst.bottom = viewTransformation.viewOffsetY + viewTransformation.viewHeight;
+
+    if (fullscreenMode == 2) {
+        dst = {0, 0, surfaceWidth, surfaceHeight};
+    } else {
+        float scaleX = static_cast<float>(surfaceWidth) / rootWindow->width;
+        float scaleY = static_cast<float>(surfaceHeight) / rootWindow->height;
+        float scale = fullscreenMode == 3 ? std::max(scaleX, scaleY)
+                    : fullscreenMode == 4 ? std::max(1.0f, std::floor(std::min(scaleX, scaleY)))
+                    : std::min(scaleX, scaleY);
+        int width = static_cast<int>(std::ceil(rootWindow->width * scale));
+        int height = static_cast<int>(std::ceil(rootWindow->height * scale));
+        int left = (surfaceWidth - width) / 2;
+        int top = (surfaceHeight - height) / 2;
+        dst = {left, top, left + width, top + height};
     }
     
     pfnASurfaceTransactionSetGeometry(windowTransaction, rootWindow->control, src, dst, 0);
@@ -962,40 +952,9 @@ void DisplayX::restoreControlState() {
     }
 }
 
-void DisplayX::toggleFullscreen() {
-    auto rootWindow = windowManager->getRootWindow();
-    if (!rootWindow) return;
-    
-    fullscreen = !fullscreen;
-    
-    ARect src{};
-    ARect dst{};
-    
-    if (fullscreen) {
-        src.left = viewTransformation.viewOffsetX;
-        src.top = viewTransformation.viewOffsetY;
-        src.right = viewTransformation.viewOffsetX + viewTransformation.viewWidth;
-        src.bottom = viewTransformation.viewOffsetY + viewTransformation.viewHeight;
-        
-        dst.left = 0;
-        dst.top = 0;
-        dst.right = surfaceWidth;
-        dst.bottom = surfaceHeight;
-    }
-    else {
-        src.left = 0;
-        src.top = 0;
-        src.right = surfaceWidth;
-        src.bottom = surfaceHeight;
-        
-        dst.left = viewTransformation.viewOffsetX;
-        dst.top = viewTransformation.viewOffsetY;
-        dst.right = viewTransformation.viewOffsetX + viewTransformation.viewWidth;
-        dst.bottom = viewTransformation.viewOffsetY + viewTransformation.viewHeight;
-    }
-    
-    pfnASurfaceTransactionSetGeometry(windowTransaction, rootWindow->control, src, dst, 0);
-    pfnASurfaceTransactionApply(windowTransaction);
+void DisplayX::setFullscreenMode(int mode) {
+    fullscreenMode = mode >= 0 && mode <= 4 ? mode : 0;
+    resizeRootWindow();
 }
 
 void DisplayX::setPerformanceMode(bool perfMode) {

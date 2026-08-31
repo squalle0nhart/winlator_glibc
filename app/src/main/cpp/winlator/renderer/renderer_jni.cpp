@@ -467,13 +467,13 @@ Java_com_winlator_cmod_widget_XServerView_nativeReparentWindow(JNIEnv *env, jobj
 
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_winlator_cmod_widget_XServerView_nativeToggleFullscreen(JNIEnv *env, jobject thiz) {
-    renderer.toggleFullscreen = true;
-    
-    if (!xserver.isDisplayX())
+Java_com_winlator_cmod_widget_XServerView_nativeSetFullscreenMode(JNIEnv *env, jobject thiz, jint mode) {
+    if (!xserver.isDisplayX()) {
+        renderer.toggleFullscreen = true;
         renderer.requestRenderer();
-    else
-        displayX.queueEvent([] { displayX.toggleFullscreen(); });
+    } else {
+        displayX.queueEvent([mode] { displayX.setFullscreenMode(mode); });
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
