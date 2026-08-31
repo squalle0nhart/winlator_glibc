@@ -1,5 +1,6 @@
 #include "effect_composer.hpp"
 #include "color_swap_spv.h"
+#include <android/log.h>
 
 #define LOG_TAG "EffectComposer"
 #define printf(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
@@ -118,11 +119,10 @@ VkResult EffectComposer::pickPhysicalDevice() {
 static uint32_t findQueueIndex(VkPhysicalDevice physicalDevice) {
     uint32_t queueFamilyCount;
     std::vector<VkQueueFamilyProperties> queueFamilyProps;
-    VkResult result;
 
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
     if (queueFamilyCount == 0) {
-        printf("Failed to query queue family properties, result %d", result);
+        printf("Failed to query queue family properties");
         return UINT32_MAX;
     }
     
@@ -176,6 +176,11 @@ VkResult EffectComposer::createDevice() {
     }
     
     dispatchTable.GetFenceFdKHR = (PFN_vkGetFenceFdKHR)vkGetDeviceProcAddr(device, "vkGetFenceFdKHR");
+    dispatchTable.GetAndroidHardwareBufferPropertiesANDROID =
+        (PFN_vkGetAndroidHardwareBufferPropertiesANDROID)vkGetDeviceProcAddr(
+            device, "vkGetAndroidHardwareBufferPropertiesANDROID");
+    if (!dispatchTable.GetAndroidHardwareBufferPropertiesANDROID)
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
      
     vkGetDeviceQueue(device, queueIndex, 0, &queue);
 
@@ -350,7 +355,7 @@ VkResult EffectComposer::createComposerTexture(Drawable *drawable) {
 
     res = AHardwareBuffer_allocate(&outDesc, &drawable->composerTexture->dstBuffer);
     if (res != 0) {
-        printf("Failed to allocate destination AHardwareBuffer, result %d\n", result);
+        printf("Failed to allocate destination AHardwareBuffer, result %d\n", res);
         return VK_ERROR_OUT_OF_DEVICE_MEMORY;
     }
 
@@ -361,7 +366,8 @@ VkResult EffectComposer::createComposerTexture(Drawable *drawable) {
     srcAHBProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
     srcAHBProps.pNext = &srcFormatProps;
 
-    result = vkGetAndroidHardwareBufferPropertiesANDROID(device, drawable->ahb, &srcAHBProps);
+    result = dispatchTable.GetAndroidHardwareBufferPropertiesANDROID(
+        device, drawable->ahb, &srcAHBProps);
     if (result != VK_SUCCESS) {
         printf("Failed to query source AHardwareBuffer properties, result %d", result);
         return result;
@@ -374,7 +380,8 @@ VkResult EffectComposer::createComposerTexture(Drawable *drawable) {
     dstAHBProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
     dstAHBProps.pNext = &dstFormatProps;
 
-    result = vkGetAndroidHardwareBufferPropertiesANDROID(device, drawable->composerTexture->dstBuffer, &dstAHBProps);
+    result = dispatchTable.GetAndroidHardwareBufferPropertiesANDROID(
+        device, drawable->composerTexture->dstBuffer, &dstAHBProps);
     if (result != VK_SUCCESS) {
         printf("Failed to query destination AHardwareBuffer properties, result %d\n", result);
         return result;
