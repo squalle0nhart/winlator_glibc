@@ -6,6 +6,7 @@
 #include <functional>
 #include <queue>
 #include <cmath>
+#include <mutex>
 #include <dlfcn.h>
 #include <unordered_set>
 #include <condition_variable>
@@ -115,6 +116,8 @@ class DisplayX {
         
         DisplayXLock eventLock;
         DisplayXLock presentLock;
+        // ponytail: serialize event and composition batches; use per-window locks if contention matters.
+        std::mutex operationMutex;
         
         ASurfaceTransaction *windowTransaction;
         ASurfaceTransaction *cursorTransaction;

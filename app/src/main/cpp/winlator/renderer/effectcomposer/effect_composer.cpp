@@ -720,16 +720,19 @@ void EffectComposer::swapColors(Drawable *drawable) {
     
 }
 
-void EffectComposer::apply(Drawable *drawable) {
+bool EffectComposer::apply(Drawable *drawable) {
     isOperationPending = true;
+    auto fail = [this] {
+        isOperationPending = false;
+        return false;
+    };
 
     if (!drawable->composerTexture) {
         VkResult result = createComposerTexture(drawable);
         if (result != VK_SUCCESS) {
             printf("Failed to create composer texture, result %d", result);
             destroyComposerTexture(drawable);
-            isOperationPending = false;
-            return;
+            return fail();
         }
         drawable->composerTexture->sizeChanged = false;
     }
@@ -739,16 +742,15 @@ void EffectComposer::apply(Drawable *drawable) {
         if (result != VK_SUCCESS) {
             printf("Failed to resize composer texture, result %d", result);
             destroyComposerTexture(drawable);
-            isOperationPending = false;
-            return;
+            return fail();
         }
         drawable->composerTexture->sizeChanged = false;
     }
     
-    vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-    vkResetFences(device, 1, &fence);
-
-    vkResetCommandBuffer(commandBuffer, 0);
+    if (vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS ||
+        vkResetFences(device, 1, &fence) != VK_SUCCESS ||
+        vkResetCommandBuffer(commandBuffer, 0) != VK_SUCCESS)
+        return fail();
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -756,11 +758,12 @@ void EffectComposer::apply(Drawable *drawable) {
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     beginInfo.pInheritanceInfo = nullptr;
 
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) return fail();
 
-    if (isSuitableForColorSwap(drawable)) swapColors(drawable);
+    if (!isSuitableForColorSwap(drawable)) return fail();
+    swapColors(drawable);
 
-    vkEndCommandBuffer(commandBuffer);
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) return fail();
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -773,8 +776,10 @@ void EffectComposer::apply(Drawable *drawable) {
     submitInfo.signalSemaphoreCount = 0;
     submitInfo.pSignalSemaphores = nullptr;
 
-    vkQueueSubmit(queue, 1, &submitInfo, fence);
+    if (vkQueueSubmit(queue, 1, &submitInfo, fence) != VK_SUCCESS) return fail();
+    bool completed = vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX) == VK_SUCCESS;
     isOperationPending = false;
+    return completed;
 }
 
 void EffectComposer::init() {

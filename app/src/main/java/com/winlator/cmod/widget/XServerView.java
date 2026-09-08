@@ -177,6 +177,7 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
     private boolean hideUnviewableWindow(Window window, String wmClass, boolean unmap) {
         if (unviewableWMClasses == null || wmClass == null) return false;
         for (String cls : unviewableWMClasses) {
+            if (cls == null || cls.isEmpty()) continue;
             if (wmClass.toLowerCase(java.util.Locale.ROOT).contains(cls.toLowerCase(java.util.Locale.ROOT))) {
                 if (window.attributes.isEnabled()) window.disableAllDescendants();
                 if (unmap) nativeUnmapWindow(window.id);

@@ -24,6 +24,19 @@ This is the standard, unmodified build. It uses the original package name, which
 
 This build mimics the package name of Genshin Impact. This is specifically designed for RedMagic devices, as the phone's software may detect this package name to enable hardware-specific gaming enhancements, such as built-in frame generation (framegen). Using this build may unlock these features and improve performance on supported RedMagic phones.
 
+# Building
+
+Initialize the native dependencies before building:
+
+```sh
+git submodule update --init --recursive
+./gradlew assembleDebug
+```
+
+Debug builds use the standard Android debug key unless `WINLATOR_STORE_PASSWORD`
+and `WINLATOR_KEY_PASSWORD` are supplied (the key password defaults to the store
+password). Release builds require `Untitled.jks` and signing credentials.
+
 # Installation
 
 1.  Download and install the latest APK from this repository's [Releases section](https://github.com/StevenMXZ/Winlator-Ludashi/releases) (choose your preferred build: `dev-vanilla`, `ludashi`, or `redmagic`).

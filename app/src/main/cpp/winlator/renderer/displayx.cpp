@@ -366,7 +366,8 @@ void DisplayX::eventThreadLoop() {
             cache->detachEnv(env);
             return;
         }
-        
+
+        std::lock_guard<std::mutex> operationGuard(operationMutex);
         auto currState = state;
         state = State::NONE;
         
@@ -411,7 +412,7 @@ void DisplayX::eventThreadLoop() {
             eventLock.notify();
         }
         
-        if (currentState != State::NONE) presentLock.notify();
+        if (currState != State::NONE) presentLock.notify();
 
         if (!eventQueue.empty() && hasSurface && surfaceChanged && !paused) {
             func = eventQueue.front();
@@ -522,7 +523,8 @@ void DisplayX::presentThreadLoop() {
         
         if (presentRR) requestUpdate = false;
         lock.unlock();
-        
+
+        std::lock_guard<std::mutex> operationGuard(operationMutex);
         auto completeContext = std::make_unique<OnCompleteContext>();
         
         while (!requests.empty()) {
@@ -539,7 +541,8 @@ void DisplayX::presentThreadLoop() {
                 pfnASurfaceTransactionSetBuffer(presentTransaction, window->control, nullptr, presentRequest->sync_fence);
             }
             else {
-                if (effectComposer->isSuitableForColorSwap(drawable)) {
+                if (effectComposer->isSuitableForColorSwap(drawable) &&
+                    effectComposer->apply(drawable)) {
                     pfnASurfaceTransactionSetBuffer(presentTransaction, window->control, drawable->composerTexture->dstBuffer, presentRequest->sync_fence);
                 }
                 else {
@@ -673,10 +676,7 @@ void DisplayX::queueEvent(std::function<void()> func) {
 
 void DisplayX::requestWindowUpdate(Window *window) {
     auto lock = presentLock.lock();
-    
-    if (effectComposer->isSuitableForColorSwap(window->drawable.get()))
-        effectComposer->apply(window->drawable.get());
-    
+
     auto presentRequest = std::make_unique<PresentRequest>();
     presentRequest->drawable = window->hasDirectContents() ? window->currentDirectContent : window->drawable.get();
     presentRequest->sync_fence = -1;
