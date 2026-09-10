@@ -42,8 +42,10 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.Downloader;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
+import com.winlator.cmod.core.DXWrapper;
 import com.winlator.cmod.core.EnvVars;
-import com.winlator.cmod.core.LsfgVkManager;
+import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.WineInfo;
@@ -131,7 +133,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         vDXWrapperConfig.setTag(shortcut.getExtra("dxwrapperConfig", shortcut.container.getDXWrapperConfig()));
 
         loadGraphicsDriverSpinner(sGraphicsDriver, sDXWrapper, vGraphicsDriverConfig, shortcut.getExtra("graphicsDriver", shortcut.container.getGraphicsDriver()),
-            shortcut.getExtra("dxwrapper", shortcut.container.getDXWrapper()));
+            DXWrapper.migrate(shortcut.getExtra("dxwrapper", shortcut.container.getDXWrapper()),
+                    DXVKConfigDialog.parseConfig(vDXWrapperConfig.getTag()).get("version")));
 
         findViewById(R.id.BTHelpDXWrapper).setOnClickListener((v) -> AppUtils.showHelpBox(context, v, R.string.dxwrapper_help_content));
 
@@ -169,23 +172,15 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setRendererSwapRB(boolean val) { rendererSwapRBHolder[0] = val; }
                 public boolean supportsLsfg() { return true; }
                 public boolean isLsfgDllAvailable() {
-                    return LsfgVkManager.isGlobalDllAvailable(context) || LsfgVkManager.containerDllPath(shortcut) != null;
+                    return LosslessDll.isGlobalDllAvailable(context) || LosslessDll.containerDllPath(shortcut) != null;
                 }
                 public int getLsfgMultiplier() { return shortcut.getLsfgMultiplier(); }
                 public void setLsfgMultiplier(int val) { shortcut.setLsfgMultiplier(val); }
                 public void setLsfgEnabled(boolean val) { shortcut.setLsfgEnabled(val); }
                 public float getLsfgFlowScale() { return shortcut.getLsfgFlowScale(); }
                 public void setLsfgFlowScale(float val) { shortcut.setLsfgFlowScale(val); }
-                public boolean getLsfgPerformanceMode() { return shortcut.getLsfgPerformanceMode(); }
-                public void setLsfgPerformanceMode(boolean val) { shortcut.setLsfgPerformanceMode(val); }
                 public String getFrameGenBackend() { return shortcut.getFrameGenBackend(); }
                 public void setFrameGenBackend(String val) { shortcut.setFrameGenBackend(val); }
-                public int getWinFgMultiplier() { return shortcut.getWinFgMultiplier(); }
-                public void setWinFgMultiplier(int val) { shortcut.setWinFgMultiplier(val); }
-                public float getWinFgFlowScale() { return shortcut.getWinFgFlowScale(); }
-                public void setWinFgFlowScale(float val) { shortcut.setWinFgFlowScale(val); }
-                public int getWinFgModel() { return shortcut.getWinFgModel(); }
-                public void setWinFgModel(int val) { shortcut.setWinFgModel(val); }
             }, rendererNativeHolder[0]).show());
         }
 
@@ -450,10 +445,17 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         setOnConfirmCallback(() -> {
             String name = etName.getText().toString().trim();
             boolean nameChanged = !shortcut.name.equals(name) && !name.isEmpty();
+            if (nameChanged) {
+                renameShortcut(name);
+                if (!new File(shortcut.file.getParent(), name + ".desktop").exists()) return;
+            }
 
             String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
             String graphicsDriverConfig = vGraphicsDriverConfig.getTag().toString();
             String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
+            KeyValueSet wrapperSettings = DXVKConfigDialog.parseConfig(vDXWrapperConfig.getTag());
+            wrapperSettings.put("version", DXWrapper.versionFor(dxwrapper, wrapperSettings.get("version"), DefaultVersion.DXVK));
+            vDXWrapperConfig.setTag(wrapperSettings.toString());
             String dxwrapperConfig = vDXWrapperConfig.getTag().toString();
             String audioDriver = StringUtils.parseIdentifier(sAudioDriver.getSelectedItem());
             String emulator = StringUtils.parseIdentifier(sEmulator.getSelectedItem());
@@ -536,10 +538,6 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                             ? (syncCpuTopologyChecked ? "1" : "0") : null);
 
             shortcut.saveData();
-
-            if (nameChanged) {
-                renameShortcut(name);
-            }
         });
     }
     private void applyFieldSetLabelStylesDynamically(ViewGroup rootView, boolean isDarkMode) {
@@ -967,8 +965,11 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
-                if (dxwrapper.startsWith("dxvk"))
-                    vDXWrapperConfig.setOnClickListener(v -> new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, ShortcutSettingsDialog.this, contentsManager).show());
+                KeyValueSet wrapperSettings = DXVKConfigDialog.parseConfig(vDXWrapperConfig.getTag());
+                wrapperSettings.put("version", DXWrapper.versionFor(dxwrapper, wrapperSettings.get("version"), DefaultVersion.DXVK));
+                vDXWrapperConfig.setTag(wrapperSettings.toString());
+                if (DXWrapper.isVulkan(dxwrapper))
+                    vDXWrapperConfig.setOnClickListener(v -> new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, DXWrapper.VEGAS.equals(dxwrapper), ShortcutSettingsDialog.this, contentsManager).show());
                 else if (dxwrapper.equals("wined3d"))
                     vDXWrapperConfig.setOnClickListener(v -> new WineD3DConfigDialog(vDXWrapperConfig).show());
                 vDXWrapperConfig.setVisibility(View.VISIBLE);
@@ -1024,4 +1025,3 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         update.run();
     }
 }
-
