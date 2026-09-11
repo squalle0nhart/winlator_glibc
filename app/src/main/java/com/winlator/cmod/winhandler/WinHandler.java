@@ -16,7 +16,6 @@ import com.winlator.cmod.inputcontrols.GamepadState;
 import com.winlator.cmod.xserver.XServer;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.hardware.input.InputManager;
 import android.os.Handler;
 import android.net.LocalServerSocket;
@@ -68,6 +67,7 @@ public class WinHandler {
 
     private static final int MAX_CONTROLLERS = 4;
     private static final int OSC_DEVICE_ID = -1;
+    public static final String PREF_CONTROLLER_SLOT_PREFIX = "controller_slot_";
     private FakeInputWriter[] writers = new FakeInputWriter[MAX_CONTROLLERS];
     private Map<Integer, Integer> deviceToSlot = new HashMap<>();
     private Set<Integer> usedSlots = new HashSet<>();
@@ -78,6 +78,7 @@ public class WinHandler {
 
     private boolean xinputDisabled;
     private boolean xinputDisabledInitialized = false;
+    private byte triggerType;
 
     private int fallbackSlot = -1;
 
@@ -104,7 +105,8 @@ public class WinHandler {
         inputManager.registerInputDeviceListener(inputDeviceListener, null);
 
         preferences = PreferenceManager.getDefaultSharedPreferences(activity.getBaseContext());
-
+        triggerType = ExternalController.normalizeTriggerType(
+                preferences.getInt("trigger_type", ExternalController.TRIGGER_IS_AXIS));
         for (int i = 0; i < MAX_CONTROLLERS; i++) {
             vibrationEnabledSlots[i] = preferences.getBoolean("vibration_slot_" + i, true);
         }
@@ -618,23 +620,37 @@ public void setVibrationEnabledForSlot(int slot, boolean enabled) {
 
     private int assignSlot(int deviceId) {
         Integer existing = deviceToSlot.get(deviceId);
-        if (existing != null)
-            return existing;
+        if (existing != null) return existing;
+
+        int preferredSlot = getPreferredSlot(deviceId);
+        if (preferredSlot >= 0 && !usedSlots.contains(preferredSlot)) return claimSlot(deviceId, preferredSlot);
 
         for (int slot = 0; slot < MAX_CONTROLLERS; slot++) {
-            if (!usedSlots.contains(slot)) {
-                usedSlots.add(slot);
-                deviceToSlot.put(deviceId, slot);
-                if (fakeInputBasePath != null && writers[slot] == null) {
-                    writers[slot] = new FakeInputWriter(fakeInputBasePath, slot);
-                    writers[slot].open();
-                    Log.d("WinHandler", "Assigned device " + deviceId + " to slot " + slot);
-                }
-                return slot;
-            }
+            if (!usedSlots.contains(slot) && preferences.getString(PREF_CONTROLLER_SLOT_PREFIX + slot, null) == null)
+                return claimSlot(deviceId, slot);
         }
         Log.w("WinHandler", "No slots available for device " + deviceId);
         return -1;
+    }
+
+    private int getPreferredSlot(int deviceId) {
+        android.view.InputDevice device = android.view.InputDevice.getDevice(deviceId);
+        if (device == null) return -1;
+        for (int slot = 0; slot < MAX_CONTROLLERS; slot++) {
+            if (device.getDescriptor().equals(preferences.getString(PREF_CONTROLLER_SLOT_PREFIX + slot, null))) return slot;
+        }
+        return -1;
+    }
+
+    private int claimSlot(int deviceId, int slot) {
+        usedSlots.add(slot);
+        deviceToSlot.put(deviceId, slot);
+        if (fakeInputBasePath != null && writers[slot] == null) {
+            writers[slot] = new FakeInputWriter(fakeInputBasePath, slot);
+            writers[slot].open();
+        }
+        Log.d("WinHandler", "Assigned device " + deviceId + " to slot " + slot);
+        return slot;
     }
 
     private void releaseSlot(int deviceId) {
@@ -696,6 +712,7 @@ public void setVibrationEnabledForSlot(int slot, boolean enabled) {
         }
         ExternalController controller = ExternalController.getController(deviceId);
         if (controller != null) {
+            controller.setTriggerType(triggerType);
             controllers.put(deviceId, controller);
         }
         return controller;
@@ -747,4 +764,8 @@ public void setVibrationEnabledForSlot(int slot, boolean enabled) {
         Executors.newSingleThreadScheduledExecutor().schedule(() -> exec(command), delaySeconds, TimeUnit.SECONDS);
     }
 
+    public void setTriggerType(int triggerType) {
+        this.triggerType = ExternalController.normalizeTriggerType(triggerType);
+        for (ExternalController controller : controllers.values()) controller.setTriggerType(this.triggerType);
+    }
 }
