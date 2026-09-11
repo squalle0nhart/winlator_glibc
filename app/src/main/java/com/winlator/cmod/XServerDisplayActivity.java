@@ -178,6 +178,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private int requestedFpsLimit;
     private FpsLimiterControl fpsLimiterControl;
     private String graphicsDriver = Container.DEFAULT_GRAPHICS_DRIVER;
+    private String graphicsWrapper = Container.DEFAULT_GRAPHICS_WRAPPER;
     private HashMap<String, String> graphicsDriverConfig;
     private String audioDriver = Container.DEFAULT_AUDIO_DRIVER;
     private String emulator = Container.DEFAULT_EMULATOR;
@@ -628,6 +629,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         graphicsDriver = container.getGraphicsDriver();
+        graphicsWrapper = container.getGraphicsWrapper();
         String graphicsDriverConfig = container.getGraphicsDriverConfig();
         audioDriver = Container.normalizeAudioDriver(container.getAudioDriver());
         emulator = container.getEmulator();
@@ -646,6 +648,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             shortcut.saveData();
 
             graphicsDriver = shortcut.getExtra("graphicsDriver", container.getGraphicsDriver());
+            graphicsWrapper = Container.normalizeGraphicsWrapper(
+                    shortcut.getExtra("graphicsWrapper", container.getGraphicsWrapper()));
             graphicsDriverConfig = shortcut.getExtra("graphicsDriverConfig", container.getGraphicsDriverConfig());
             audioDriver = Container.normalizeAudioDriver(shortcut.getExtra("audioDriver", container.getAudioDriver()));
             emulator = shortcut.getExtra("emulator", container.getEmulator());
@@ -2881,7 +2885,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         File graphicsRuntimeMarker = new File(rootDir,
                 "usr/lib/.winlator-graphics-runtime-a20866cf-v3");
-        String wrapperArchive = resolveGraphicsDriverArchiveName(graphicsDriver);
+        String wrapperArchive = resolveGraphicsWrapperArchiveName(graphicsWrapper);
         boolean installCommonRuntime = firstTimeBoot || !graphicsRuntimeMarker.isFile();
         boolean wrapperChanged = !wrapperArchive.equals(container.getExtra("installedGraphicsWrapper"));
         if (installCommonRuntime || wrapperChanged) {
@@ -2979,9 +2983,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
-    static String resolveGraphicsDriverArchiveName(String graphicsDriver) {
-        if (graphicsDriver == null) return "wrapper";
-        switch (graphicsDriver.toLowerCase(java.util.Locale.ENGLISH)) {
+    static String resolveGraphicsWrapperArchiveName(String graphicsWrapper) {
+        switch (graphicsWrapper == null ? "" : graphicsWrapper) {
             case "wrapper-winnative":
             case "wrapper-original":
             case "wrapper-v2":

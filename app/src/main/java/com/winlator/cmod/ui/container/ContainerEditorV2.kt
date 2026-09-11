@@ -195,6 +195,7 @@ private class ContainerEditorStateV2(
             "freedreno"
         } else Container.DEFAULT_GRAPHICS_DRIVER
     )
+    var graphicsWrapper by mutableStateOf(editing?.getGraphicsWrapper() ?: Container.DEFAULT_GRAPHICS_WRAPPER)
     var graphicsConfig by mutableStateOf(
         (editing?.graphicsDriverConfig ?: Container.DEFAULT_GRAPHICSDRIVERCONFIG).let { original ->
             if (readConfig(original, "version", ';').isBlank()) writeConfig(original, "version", preferredDriver, ';') else original
@@ -327,7 +328,7 @@ private class ContainerEditorStateV2(
         renderer, rendererPresentMode, rendererDriver, filterMode, surfaceFormat, trueDisplayX,
         displayXPerformanceMode, displayXPresentAtRefreshRate, displayXBackPressure,
         displayXPrecisePresentation, frameGenBackend, lsfgMultiplier,
-        lsfgFlowScale, graphicsDriver, graphicsConfig,
+        lsfgFlowScale, graphicsDriver, graphicsWrapper, graphicsConfig,
         wrapper, wrapperConfig, emulator, fexVersion, boxVersion, fexPreset, boxPreset, exclusive, xinput, dinput,
         syncCpu, startup, openGlDefaultInitialized, autoMesaGlVersionOverride, envVars,
         cpu64.joinToString(), cpu32.joinToString(), components.entries.sortedBy { it.key }.joinToString()
@@ -382,6 +383,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
 
     val screenEntries = remember { context.resources.getStringArray(R.array.screen_size_entries).toList() }
     val graphicsEntries = remember { context.resources.getStringArray(R.array.graphics_driver_entries).toList() }
+    val graphicsWrapperEntries = remember { context.resources.getStringArray(R.array.graphics_wrapper_entries).toList() }
     val wrapperEntries = remember { context.resources.getStringArray(R.array.dxwrapper_entries).toList() }
     val audioEntries = remember { context.resources.getStringArray(R.array.audio_driver_entries).toList() }
     val localeEntries = remember { listOf("Default") + context.resources.getStringArray(R.array.some_lc_all).toList() }
@@ -461,6 +463,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         container.setCPUListWoW64(state.cpu32.indices.filter { state.cpu32[it] }.joinToString(","))
         container.setSyncCpuTopology(state.syncCpu)
         container.setGraphicsDriver(state.graphicsDriver)
+        container.setGraphicsWrapper(state.graphicsWrapper)
         container.setGraphicsDriverConfig(state.graphicsConfig)
         container.setRendererNative(state.renderer == "EGL")
         container.setRendererPresentMode(state.rendererPresentMode)
@@ -559,6 +562,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                 put("midiSoundFont", state.soundFont)
                 put("lc_all", state.locale)
                 put("extraData", JSONObject()
+                    .put("graphicsWrapper", state.graphicsWrapper)
                     .put("hudMode", state.hudMode.toString())
                     .put("mouseWarpOverride", state.mouseWarp)
                     .put("useDisplayX", if (state.renderer == "DisplayX") "1" else "0")
@@ -657,7 +661,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                     item(category) {
                         ContainerCategoryV2(
                             category, state, runtimeChoices, arm64, screenEntries, graphicsEntries,
-                            wrapperEntries, audioEntries, localeEntries, soundFonts, gpuNames, fexPresets,
+                            graphicsWrapperEntries, wrapperEntries, audioEntries, localeEntries, soundFonts, gpuNames, fexPresets,
                             boxPresets, catalog, installing, ::installWine, ::installDriver, ::installRuntime
                         )
                     }
@@ -680,7 +684,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                     item(category) {
                         ContainerCategoryV2(
                             category, state, runtimeChoices, arm64, screenEntries, graphicsEntries,
-                            wrapperEntries, audioEntries, localeEntries, soundFonts, gpuNames, fexPresets,
+                            graphicsWrapperEntries, wrapperEntries, audioEntries, localeEntries, soundFonts, gpuNames, fexPresets,
                             boxPresets, catalog, installing, ::installWine, ::installDriver, ::installRuntime
                         )
                     }
@@ -715,6 +719,7 @@ private fun ContainerCategoryV2(
     arm64: Boolean,
     screenEntries: List<String>,
     graphicsEntries: List<String>,
+    graphicsWrapperEntries: List<String>,
     wrapperEntries: List<String>,
     audioEntries: List<String>,
     localeEntries: List<String>,
@@ -924,10 +929,18 @@ private fun ContainerCategoryV2(
             }
             SettingsCard {
                 SettingChoice(
-                    "Graphics Driver",
+                    "OpenGL Driver",
                     graphicsDriverLabel(graphicsEntries, s.graphicsDriver),
                     graphicsEntries
                 ) { s.selectGraphicsDriver(StringUtils.parseIdentifier(it)) }
+                SettingsDivider()
+                SettingChoice(
+                    "Vulkan Wrapper",
+                    graphicsWrapperEntries.firstOrNull {
+                        StringUtils.parseIdentifier(it).equals(s.graphicsWrapper, true)
+                    } ?: s.graphicsWrapper,
+                    graphicsWrapperEntries
+                ) { s.graphicsWrapper = StringUtils.parseIdentifier(it) }
                 catalog?.let { c ->
                     SettingsDivider()
                     SettingDriverChoice("Driver Version", s.driverVersion, c.drivers, installing, installDriver) {
