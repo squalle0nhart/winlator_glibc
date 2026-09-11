@@ -325,7 +325,8 @@ void EGLRenderer::renderDrawable(Drawable *drawable, int x, int y, bool isWindow
         XForm::set(tmpXForm1, x, y, drawable->width, drawable->height);
         XForm::multiply(tmpXForm1, tmpXForm1, tmpXForm2);
         renderDrawable(drawable->glTexture.get(), 6, tmpXForm1, isWindow,
-                !drawable->isDirectContent && drawable->format == AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
+                !drawable->isDirectContent && drawable->format == AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM,
+                drawable->width, drawable->height);
     }
 }
 
@@ -445,13 +446,16 @@ void EGLRenderer::createEGLSurface(ANativeWindow *window) {
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
-void EGLRenderer::renderDrawable(GLTexture *texture, int length, float xform[], bool isFromWindow, bool swapColors) {
+void EGLRenderer::renderDrawable(GLTexture *texture, int length, float xform[], bool isFromWindow, bool swapColors, int width, int height) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture->id);
     glUniform1i(drawableShader->getUniformLoc("texture"), 0);
     glUniform1fv(drawableShader->getUniformLoc("xform"), length, xform);
     glUniform1i(drawableShader->getUniformLoc("is_cursor"), isFromWindow ? 0 : 1);
     glUniform1i(drawableShader->getUniformLoc("swap_colors"), swapColors ? 1 : 0);
+    glUniform1i(drawableShader->getUniformLoc("filter_mode"), filterMode);
+    glUniform2f(drawableShader->getUniformLoc("texture_size"), (float)width, (float)height);
+    glUniform1f(drawableShader->getUniformLoc("sharpness"), sharpness);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindTexture(GL_TEXTURE_2D, 0);
 }

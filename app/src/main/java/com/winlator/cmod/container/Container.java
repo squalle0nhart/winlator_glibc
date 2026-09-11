@@ -31,6 +31,21 @@ public class Container {
     public static final String DEFAULT_DISPLAY_DRIVER = "egl";
     public static final String DEFAULT_ENV_VARS = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,sysmem DXVK_HUD=devinfo,fps,frametimes,gpuload,version,api";
     public static final String DEFAULT_SCREEN_SIZE = "1280x720";
+    /** Panel-shaped default for new containers; existing container data is never changed. */
+    public static String defaultScreenSizeFor(android.content.Context context) {
+        android.hardware.display.DisplayManager manager = (android.hardware.display.DisplayManager)
+                context.getSystemService(android.content.Context.DISPLAY_SERVICE);
+        android.view.Display display = manager != null
+                ? manager.getDisplay(android.view.Display.DEFAULT_DISPLAY) : null;
+        if (display == null) return DEFAULT_SCREEN_SIZE;
+        android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
+        display.getRealMetrics(metrics);
+        return defaultScreenSizeForPanel(metrics.widthPixels, metrics.heightPixels);
+    }
+
+    public static String defaultScreenSizeForPanel(int width, int height) {
+        return com.winlator.cmod.core.FrameGenDisplayFit.defaultScreenSize(width, height);
+    }
     public static final String DEFAULT_GRAPHICS_DRIVER = "wrapper";
     public static final String DEFAULT_AUDIO_DRIVER = "pulse-audio-gn";
     public static final String DEFAULT_EMULATOR = "FEXCore";

@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,6 +54,10 @@ public class DXVKConfigDialog extends ContentDialog {
     private List<String> dxvkVersions;
     private final boolean vegas;
     private static final Pattern SEMVER = Pattern.compile("(\\d+)\\.(\\d+)(?:\\.(\\d+))?");
+    public static final String[] ANISOTROPY_VALUES = {"0", "2", "4", "8", "16"};
+    public static final String[] LOD_BIAS_VALUES = {"0", "auto", "-0.25", "-0.5", "-0.75", "-1.0"};
+    private static final String[] ANISOTROPY_LABELS = {"Game default", "2×", "4×", "8×", "16×"};
+    private static final String[] LOD_BIAS_LABELS = {"Game default", "Auto", "−0.25", "−0.5", "−0.75", "−1.0"};
 
     private static Integer tryGetMajor(String s) {
         if (s == null) return null;
@@ -107,6 +112,8 @@ public class DXVKConfigDialog extends ContentDialog {
         final Spinner sFramerate = findViewById(R.id.SFramerate);
         final Spinner sVKD3DFeatureLevel = findViewById(R.id.SVKD3DFeatureLevel);
         final Spinner sDDRAWrapper = findViewById(R.id.SDDRAWrapper);
+        final Spinner sAnisotropy = findViewById(R.id.SAnisotropy);
+        final Spinner sLodBias = findViewById(R.id.SLodBias);
         swAsync = findViewById(R.id.SWAsync);
         swAsyncCache = findViewById(R.id.SWAsyncCache);
         swMaxFrameLatency = findViewById(R.id.SWMaxFrameLatency);
@@ -123,6 +130,8 @@ public class DXVKConfigDialog extends ContentDialog {
         ddrawAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
         sDDRAWrapper.setAdapter(ddrawAdapter);
         configureContentSpinnerDropdown(sDDRAWrapper);
+        setStringAdapter(sAnisotropy, ANISOTROPY_LABELS);
+        setStringAdapter(sLodBias, LOD_BIAS_LABELS);
         loadDxvkVersionSpinner(this.contentsManager, sDXVKVersion, isARM64EC);
         loadVkd3dVersionSpinner(this.contentsManager, sVKD3DVersion, isARM64EC);
 
@@ -141,6 +150,8 @@ public class DXVKConfigDialog extends ContentDialog {
                 break;
             }
         }
+        sAnisotropy.setSelection(indexOf(ANISOTROPY_VALUES, config.get("anisotropy")));
+        sLodBias.setSelection(indexOf(LOD_BIAS_VALUES, config.get("lodBias")));
 
         swAsync.setChecked(config.get("async").equals("1"));
         swAsyncCache.setChecked(config.get("asyncCache").equals("1"));
@@ -251,9 +262,23 @@ public class DXVKConfigDialog extends ContentDialog {
             VKD3DVersionItem selectedItem = (VKD3DVersionItem) sVKD3DVersion.getSelectedItem();
             config.put("vkd3dVersion", selectedItem.getIdentifier());
             config.put("vkd3dLevel", sVKD3DFeatureLevel.getSelectedItem().toString());
-            config.put("ddrawrapper", ddrawEntries.get(sDDRAWrapper.getSelectedItemPosition()));
+        config.put("ddrawrapper", ddrawEntries.get(sDDRAWrapper.getSelectedItemPosition()));
+        config.put("anisotropy", ANISOTROPY_VALUES[sAnisotropy.getSelectedItemPosition()]);
+        config.put("lodBias", LOD_BIAS_VALUES[sLodBias.getSelectedItemPosition()]);
             anchor.setTag(config.toString());
         });
+    }
+
+    private void setStringAdapter(Spinner spinner, String[] labels) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, labels);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
+        spinner.setAdapter(adapter);
+        configureContentSpinnerDropdown(spinner);
+    }
+
+    private static int indexOf(String[] values, String value) {
+        for (int i = 0; i < values.length; i++) if (values[i].equals(value)) return i;
+        return 0;
     }
 
     private void updateConfigVisibility(int dxvkType) {
@@ -321,6 +346,10 @@ public class DXVKConfigDialog extends ContentDialog {
     }
 
     public static void setEnvVars(Context context, KeyValueSet config, EnvVars envVars) {
+        setEnvVars(context, config, envVars, 0f);
+    }
+
+    public static void setEnvVars(Context context, KeyValueSet config, EnvVars envVars, float autoLodBias) {
         String content = "";
 
         String framerate = config.get("framerate");
@@ -337,6 +366,12 @@ public class DXVKConfigDialog extends ContentDialog {
             content += "dxgi.maxFrameLatency = 1";
         }
 
+        String textureOptions = textureFilteringOptions(config, autoLodBias);
+        if (!textureOptions.isEmpty()) {
+            if (!content.isEmpty()) content += "; ";
+            content += textureOptions;
+        }
+
         String async = config.get("async");
         if (!async.isEmpty() && !async.equals("0"))
             envVars.put("DXVK_ASYNC", "1");
@@ -350,6 +385,36 @@ public class DXVKConfigDialog extends ContentDialog {
 
         envVars.put("VKD3D_FEATURE_LEVEL", config.get("vkd3dLevel"));
         envVars.put("DXVK_STATE_CACHE_PATH", context.getFilesDir() + "/imagefs/" + ImageFs.CACHE_PATH);
+    }
+
+    public static float autoLodBias(int gameW, int gameH, int panelW, int panelH) {
+        if (gameW <= 0 || gameH <= 0 || panelW <= 0 || panelH <= 0) return 0f;
+        int gameLong = Math.max(gameW, gameH), gameShort = Math.min(gameW, gameH);
+        int panelLong = Math.max(panelW, panelH), panelShort = Math.min(panelW, panelH);
+        float scale = Math.min((float) panelLong / gameLong, (float) panelShort / gameShort);
+        return scale > 1f ? Math.max((float) (-Math.log(scale) / Math.log(2d)), -2f) : 0f;
+    }
+
+    public static String textureFilteringOptions(KeyValueSet config, float autoLodBias) {
+        StringBuilder options = new StringBuilder();
+        int anisotropy;
+        try { anisotropy = Math.min(16, Integer.parseInt(config.get("anisotropy"))); }
+        catch (NumberFormatException ignored) { anisotropy = 0; }
+        if (anisotropy > 0) options.append("d3d9.samplerAnisotropy = ").append(anisotropy)
+                .append("; d3d11.samplerAnisotropy = ").append(anisotropy);
+
+        String rawBias = config.get("lodBias");
+        float bias = 0f;
+        if ("auto".equals(rawBias)) bias = autoLodBias;
+        else try { bias = Math.max(-2f, Math.min(0f, Float.parseFloat(rawBias))); }
+        catch (NumberFormatException ignored) {}
+        if (bias < 0f) {
+            if (options.length() > 0) options.append("; ");
+            String value = String.format(Locale.US, "%.2f", bias);
+            options.append("d3d9.samplerLodBias = ").append(value)
+                    .append("; d3d11.samplerLodBias = ").append(value);
+        }
+        return options.toString();
     }
 
     private boolean isVersionAllowedForArch(String version, boolean isARM64EC) {

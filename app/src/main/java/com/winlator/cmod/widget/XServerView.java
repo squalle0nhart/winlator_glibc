@@ -272,6 +272,14 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
         if (!destroyed) nativeSetShowFPS(showFPS);
     }
 
+    public void setFilterMode(int mode) {
+        if (!destroyed) nativeSetFilterMode(mode);
+    }
+
+    public void setSharpness(float sharpness) {
+        if (!destroyed) nativeSetSharpness(sharpness);
+    }
+
     @Override
     public void setFpsLimit(int fps) {
         fpsLimit = Math.max(0, Math.min(1000, fps));
@@ -366,6 +374,10 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
     public native void nativeSetScreenOffsetYRelativeToCursor(boolean cond);
     @FastNative
     public native void nativeSetMagnifierZoom(float magnifierZoom);
+    @FastNative
+    public native void nativeSetFilterMode(int mode);
+    @FastNative
+    public native void nativeSetSharpness(float sharpness);
     @FastNative
     public native void nativeSetUnviewableWMClass(String unviewableWMName);
     @FastNative

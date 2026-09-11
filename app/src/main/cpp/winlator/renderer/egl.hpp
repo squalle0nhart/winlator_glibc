@@ -90,7 +90,7 @@ class EGLRenderer {
         void destroyEGLSurface();
         void destroyEGLContext();
         void renderCursor();
-        void renderDrawable(GLTexture *texture, int length, float xform[], bool isFromWindow, bool swapColors);
+        void renderDrawable(GLTexture *texture, int length, float xform[], bool isFromWindow, bool swapColors, int width, int height);
         void updateTextureDrawable(GLTexture *texture, int width, int height, void *data);
         std::unique_ptr<GLTexture> allocateTexture(int width, int height);
         std::unique_ptr<GLTexture> allocateTextureDirect(AHardwareBuffer* hardwareBuffer);
@@ -106,6 +106,8 @@ class EGLRenderer {
         bool magnifierEnabled = true;
         float magnifierZoom = 1.0f;
         bool cursorVisible = true;
+        int filterMode = 0;
+        float sharpness = 0.5f;
         WindowManager *windowManager;
         CursorManager *cursorManager;
         JNICache *cache;

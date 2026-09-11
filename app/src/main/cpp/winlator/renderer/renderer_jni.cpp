@@ -507,6 +507,16 @@ Java_com_winlator_cmod_widget_XServerView_nativeSetMagnifierZoom(JNIEnv *env, jo
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_widget_XServerView_nativeSetFilterMode(JNIEnv *, jobject, jint mode) {
+    if (!xserver.isDisplayX()) renderer.filterMode = mode;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_widget_XServerView_nativeSetSharpness(JNIEnv *, jobject, jfloat sharpness) {
+    if (!xserver.isDisplayX()) renderer.sharpness = std::max(0.0f, std::min(1.0f, (float)sharpness));
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_widget_XServerView_nativeSetUnviewableWMClass(JNIEnv *env, jobject thiz, jstring unviewableWMName) {
     const char *chars = env->GetStringUTFChars(unviewableWMName, nullptr);
     std::string str(chars);
