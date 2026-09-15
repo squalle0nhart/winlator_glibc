@@ -51,6 +51,7 @@ struct Caps {
     FeatureSupport features;
     bool featuresEnabled   = false;  // the chain was passed to vkCreateDevice
     bool storageOnSwapchainFormat = false;
+    bool linearBlitOnSwapchainFormat = false;
     VkFormat probedFormat  = VK_FORMAT_UNDEFINED;
     char reason[160]       = "not probed";
 
@@ -69,6 +70,9 @@ FeatureSupport queryFeatures(const VkTable& vk, VkPhysicalDevice pd);
 // Probe VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT on the live swapchain format.
 // `generate` writes into an image of this format via a compute dispatch.
 bool probeStorageFormat(const VkTable& vk, VkPhysicalDevice pd, VkFormat fmt);
+
+// Whether this format supports filtered capture-resolution blits.
+bool probeLinearBlit(const VkTable& vk, VkPhysicalDevice pd, VkFormat fmt);
 
 // Fill caps.reason with the FIRST gate that failed (or "supported").
 void explain(Caps& caps);

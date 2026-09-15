@@ -59,6 +59,14 @@ bool probeStorageFormat(const VkTable& vk, VkPhysicalDevice pd, VkFormat fmt) {
     return (fp.optimalTilingFeatures & need) == need;
 }
 
+bool probeLinearBlit(const VkTable& vk, VkPhysicalDevice pd, VkFormat fmt) {
+    if (pd == VK_NULL_HANDLE || fmt == VK_FORMAT_UNDEFINED
+        || !vk.GetPhysicalDeviceFormatProperties) return false;
+    VkFormatProperties fp{};
+    vk.GetPhysicalDeviceFormatProperties(pd, fmt, &fp);
+    return (fp.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != 0;
+}
+
 void explain(Caps& caps) {
     const FeatureSupport& f = caps.features;
     const char* why = nullptr;

@@ -167,6 +167,7 @@ void VulkanRendererContext::loadDeviceDispatch() {
     LOAD_D2(CmdSetScissor);
     LOAD_D2(CmdPipelineBarrier);
     LOAD_D2(CmdCopyImage);
+    LOAD_D2(CmdBlitImage);
     LOAD_D2(CmdCopyBufferToImage);
     LOAD_D2(CreateSampler);
     LOAD_D2(DestroySampler);
@@ -356,6 +357,7 @@ void VulkanRendererContext::createSwapchain() {
     swapchainFmt = VK_FORMAT_R8G8B8A8_UNORM;
     lsfgCaps_.probedFormat = swapchainFmt;
     lsfgCaps_.storageOnSwapchainFormat = lsfg::probeStorageFormat(vk_, physicalDevice, swapchainFmt);
+    lsfgCaps_.linearBlitOnSwapchainFormat = lsfg::probeLinearBlit(vk_, physicalDevice, swapchainFmt);
     lsfg::explain(lsfgCaps_);
     RLOG("lsfg-native: %s", lsfgCaps_.reason);
     const bool nativeFg = fgArmed_.load() && fgCapsOk();
@@ -1179,7 +1181,9 @@ void VulkanRendererContext::renderFrame() {
     if (fgArmed_.load(std::memory_order_relaxed) && fgCapsOk() && swapchainTransferDst) {
         const int mult = fgMultiplier_.load(std::memory_order_relaxed);
         const uint32_t want = (uint32_t)std::min(std::max(mult, 2), 4) + 1u;
-        compositeArmed = ensureCompositeTargets(swapchainExt.width, swapchainExt.height, want);
+        uint32_t ringW = 0, ringH = 0;
+        compositeExtentFor(ringW, ringH);
+        compositeArmed = ensureCompositeTargets(ringW, ringH, want);
         if (compositeArmed) compositeArmed = createCursorOverlayRenderPass();
         if (compositeArmed && !compositeTargets.empty())
             compositeIndex = (compositeIndex + 1) % (uint32_t)compositeTargets.size();
@@ -1206,7 +1210,7 @@ void VulkanRendererContext::renderFrame() {
                     fgPerfPreset_.load(std::memory_order_relaxed),
                     fgFlowScale_.load(std::memory_order_relaxed));
             }
-            if (winfgEngine_->prepare(swapchainExt.width, swapchainExt.height, swapchainFmt)) {
+            if (winfgEngine_->prepare(compositeW, compositeH, swapchainFmt)) {
                 fgPlan_.generations = winfgEngine_->plan(capacity);
                 ++fgSourceFrames_;
             }
@@ -1222,9 +1226,9 @@ void VulkanRendererContext::renderFrame() {
         // first prepare so the 25-pipeline chain is built once at the right size.
         if (containerWidth > 0 && containerHeight > 0)
             lsfgEngine_->setGuestExtent((uint32_t)containerWidth, (uint32_t)containerHeight);
-        if (lsfgEngine_->needsRebuild(swapchainExt.width, swapchainExt.height, swapchainFmt))
+        if (lsfgEngine_->needsRebuild(compositeW, compositeH, swapchainFmt))
             vk_.DeviceWaitIdle(device);
-        if (lsfgEngine_->prepare(swapchainExt.width, swapchainExt.height, swapchainFmt)) {
+        if (lsfgEngine_->prepare(compositeW, compositeH, swapchainFmt)) {
             lsfgEngine_->setPresentedRate(fgPresentedRate_);
             fgPlan_.generations = lsfgEngine_->plan(capacity, ++fgSourceFrames_);
         }

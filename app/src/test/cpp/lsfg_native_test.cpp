@@ -1,4 +1,5 @@
 #include "lsfg_pacer.hpp"
+#include "lsfg_capture.h"
 #include "lsfg_dll.h"
 #include "lsfg_dxbc.h"
 
@@ -7,6 +8,13 @@
 #include <vector>
 
 int main() {
+    assert(lsfg::captureExtent(2712, 1220, 720).width == 1600);
+    assert(lsfg::captureExtent(2712, 1220, 720).height == 720);
+    assert(lsfg::captureExtent(1920, 1080, 720).width == 1280);
+    assert(lsfg::captureExtent(1920, 1080, 1080).height == 1080);
+    assert(lsfg::captureExtent(2400, 1080, 100).height == 270);
+    assert(lsfg::captureExtent(2400, 1080, 0).height == 1080);
+
     lsfg::LsfgPacer pacer;
     for (uint32_t multiplier : {0u, 1u, 2u, 3u, 4u, 99u}) {
         pacer.SetConfig({multiplier, 0, 60.0f});

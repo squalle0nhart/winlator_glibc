@@ -1,6 +1,7 @@
-// LSFG compositor integration adapted from Bannerlator 63af72a (GPL-3.0-or-later).
+// LSFG compositor integration adapted from Bannerlator 63af72a and PR #512 (GPL-3.0-or-later).
 #include "VulkanRendererContext.h"
 #include "lsfg/lsfg_engine.h"
+#include "lsfg/lsfg_capture.h"
 #include "lsfg/lsfg_vkd.h"
 #include "winfg/winfg_engine.h"
 
@@ -307,13 +308,7 @@ void VulkanRendererContext::recordFrameGenGeneration(VkCommandBuffer cb, uint32_
         vk_.CmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,nullptr, 0,nullptr, 2,pre);
 
-        VkImageCopy region{};
-        region.srcSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
-        region.dstSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
-        region.extent={w,h,1};
-        vk_.CmdCopyImage(cb, dst.img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                         swapchainImages[imgIdx], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                         1, &region);
+        recordCompositeToSwapchainTransfer(cb, dst.img, imgIdx);
 
         // Restore the generation target first; the swapchain image's own final
         // transition depends on whether the cursor overlay runs for it.
@@ -368,6 +363,39 @@ void VulkanRendererContext::setFrameGenTuning(float flowScale, float refreshHz) 
     // and unknown, which was visible in the logs as max= alternating.
     if (refreshHz > 1.0f) fgRefreshHz_.store(refreshHz, std::memory_order_relaxed);
     fgConfigDirty_.store(true, std::memory_order_relaxed);
+}
+
+void VulkanRendererContext::compositeExtentFor(uint32_t& w, uint32_t& h) const {
+    w = swapchainExt.width;
+    h = swapchainExt.height;
+    // Win-FG remains panel-sized; LSFG follows the real X/render height while
+    // keeping the panel aspect so the final blit cannot stretch the image.
+    if (fgEngineKind_.load(std::memory_order_relaxed) == 1) return;
+    const lsfg::CaptureExtent capture = lsfg::captureExtent(w, h, containerHeight);
+    w = capture.width;
+    h = capture.height;
+}
+
+void VulkanRendererContext::recordCompositeToSwapchainTransfer(
+    VkCommandBuffer cb, VkImage src, uint32_t imgIdx) {
+    if (compositeW == swapchainExt.width && compositeH == swapchainExt.height) {
+        VkImageCopy region{};
+        region.srcSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
+        region.dstSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
+        region.extent={compositeW,compositeH,1};
+        vk_.CmdCopyImage(cb, src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                         swapchainImages[imgIdx], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        return;
+    }
+
+    VkImageBlit blit{};
+    blit.srcSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
+    blit.srcOffsets[1]={(int32_t)compositeW,(int32_t)compositeH,1};
+    blit.dstSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
+    blit.dstOffsets[1]={(int32_t)swapchainExt.width,(int32_t)swapchainExt.height,1};
+    vk_.CmdBlitImage(cb, src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                     swapchainImages[imgIdx], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit,
+                     lsfgCaps_.linearBlitOnSwapchainFormat ? VK_FILTER_LINEAR : VK_FILTER_NEAREST);
 }
 
 // ================== Native LSFG: per-present software cursor =================
@@ -552,15 +580,7 @@ void VulkanRendererContext::copyCompositeToSwapchain(VkCommandBuffer cb, uint32_
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT|VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,nullptr, 0,nullptr, 2,pre);
 
-    // Same format and same extent, so a copy is enough — no blit, no filtering.
-    VkImageCopy region{};
-    region.srcSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
-    region.dstSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
-    region.extent={compositeW, compositeH, 1};
-    vk_.CmdCopyImage(cb,
-        t.img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        swapchainImages[imgIdx], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1, &region);
+    recordCompositeToSwapchainTransfer(cb, t.img, imgIdx);
 
     // The cursor overlay, when it runs, takes the image from TRANSFER_DST to
     // PRESENT_SRC itself; only do it here when there is no overlay.

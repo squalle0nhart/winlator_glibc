@@ -200,25 +200,29 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
             (uint32_t)postUpload.size(), postUpload.data());
     }
 
+    const VkExtent2D targetExt = renderExtent();
     VkRenderPassBeginInfo rpi{};
     rpi.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     rpi.renderPass = targetRenderPass();
     rpi.framebuffer = targetFramebuffer(imgIdx);
-    rpi.renderArea = {{0, 0}, swapchainExt};
+    rpi.renderArea = {{0, 0}, targetExt};
     VkClearValue clear = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
     rpi.clearValueCount = 1;
     rpi.pClearValues = &clear;
     vk_.CmdBeginRenderPass(cb, &rpi, VK_SUBPASS_CONTENTS_INLINE);
 
-    VkViewport viewport{0, 0, (float)swapchainExt.width, (float)swapchainExt.height, 0, 1};
+    VkViewport viewport{0, 0, (float)targetExt.width, (float)targetExt.height, 0, 1};
     vk_.CmdSetViewport(cb, 0, 1, &viewport);
 
-    int32_t scX = std::max(0, scissorRect.offset.x);
-    int32_t scY = std::max(0, scissorRect.offset.y);
-    uint32_t maxW = swapchainExt.width > (uint32_t)scX ? swapchainExt.width - (uint32_t)scX : 0u;
-    uint32_t maxH = swapchainExt.height > (uint32_t)scY ? swapchainExt.height - (uint32_t)scY : 0u;
+    const float scaleX = (float)targetExt.width / (float)std::max(1u, swapchainExt.width);
+    const float scaleY = (float)targetExt.height / (float)std::max(1u, swapchainExt.height);
+    int32_t scX = std::max(0, (int32_t)std::lround(scissorRect.offset.x * scaleX));
+    int32_t scY = std::max(0, (int32_t)std::lround(scissorRect.offset.y * scaleY));
+    uint32_t maxW = targetExt.width > (uint32_t)scX ? targetExt.width - (uint32_t)scX : 0u;
+    uint32_t maxH = targetExt.height > (uint32_t)scY ? targetExt.height - (uint32_t)scY : 0u;
     VkRect2D scissor{{scX, scY},
-        {std::min(scissorRect.extent.width, maxW), std::min(scissorRect.extent.height, maxH)}};
+        {std::min((uint32_t)std::lround(scissorRect.extent.width * scaleX), maxW),
+         std::min((uint32_t)std::lround(scissorRect.extent.height * scaleY), maxH)}};
     vk_.CmdSetScissor(cb, 0, 1, &scissor);
 
     float rotCosR, rotSinR;
@@ -283,9 +287,9 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
             pc.srcW = (float)std::max(d.w, 1);
             pc.srcH = (float)std::max(d.h, 1);
             pc.outW = std::max(1.0f, std::abs(pc.ndcX1 - pc.ndcX0) * 0.5f *
-                                       (float)swapchainExt.width);
+                                       (float)targetExt.width);
             pc.outH = std::max(1.0f, std::abs(pc.ndcY1 - pc.ndcY0) * 0.5f *
-                                       (float)swapchainExt.height);
+                                       (float)targetExt.height);
             pc.effectId = postFXMode;
             pc.sharpness = sharpness;
             pc.cosR = rotCosR;

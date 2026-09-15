@@ -100,6 +100,7 @@ struct VkTable {
     PFN_vkCmdSetScissor CmdSetScissor;
     PFN_vkCmdPipelineBarrier CmdPipelineBarrier;
     PFN_vkCmdCopyImage CmdCopyImage;
+    PFN_vkCmdBlitImage CmdBlitImage;
     PFN_vkCmdCopyBufferToImage CmdCopyBufferToImage;
     PFN_vkCreateSampler CreateSampler;
     PFN_vkDestroySampler DestroySampler;
@@ -394,6 +395,12 @@ public:
     std::atomic<float> fgRefreshHz_{0.0f};
     std::atomic<bool>  fgConfigDirty_{true};
 
+    void compositeExtentFor(uint32_t& w, uint32_t& h) const;
+    VkExtent2D renderExtent() const {
+        return compositeActive() ? VkExtent2D{compositeW, compositeH} : swapchainExt;
+    }
+    void recordCompositeToSwapchainTransfer(VkCommandBuffer cb, VkImage src, uint32_t imgIdx);
+
     bool  createCompositeRenderPass();
     bool  ensureCompositeTargets(uint32_t w, uint32_t h, uint32_t count);
     void  destroyCompositeTargets();
@@ -403,7 +410,7 @@ public:
     // Render pass / framebuffer this frame draws its FINAL pass into.
     VkRenderPass  targetRenderPass() const;
     VkFramebuffer targetFramebuffer(uint32_t imgIdx) const;
-    // Copy the finished composite into the acquired swapchain image and leave
+    // Copy/blit the finished composite into the acquired swapchain image and leave
     // it in PRESENT_SRC. No-op when the composite path is not active.
     void  copyCompositeToSwapchain(VkCommandBuffer cb, uint32_t imgIdx);
 
