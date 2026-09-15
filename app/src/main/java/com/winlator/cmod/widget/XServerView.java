@@ -58,7 +58,7 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
     private WinlatorHUD hudRef;
     private FrameRating classicHudRef;
     private boolean pipMode;
-    private volatile int fpsLimit;
+    private volatile float fpsLimit;
     private volatile boolean destroyed;
     
     public XServerView(Context context, XServer xserver) {
@@ -281,12 +281,12 @@ public class XServerView extends XServerRendererView implements SurfaceHolder.Ca
     }
 
     @Override
-    public void setFpsLimit(int fps) {
-        fpsLimit = Math.max(0, Math.min(1000, fps));
+    public void setFpsLimit(float fps) {
+        fpsLimit = Math.max(0f, Math.min(1000f, fps));
     }
 
     @Override
-    public int getFpsLimit() {
+    public float getFpsLimit() {
         return fpsLimit;
     }
 

@@ -222,12 +222,6 @@ public class ShortcutsFragment extends Fragment {
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        if (manager != null) loadShortcutsList();
-    }
-
-    @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         super.onCreateOptionsMenu(menu, inflater);
 
